@@ -18,8 +18,7 @@ Description=Monitor GPIO pin and execute script on interrupt
 After=multi-user.target
  
 [Service]
-Type=oneshot
-RemainAfterExit=true
+Type=simple
 ExecStart=/usr/local/sbin/gpio-poll.py
 
 [Install]
