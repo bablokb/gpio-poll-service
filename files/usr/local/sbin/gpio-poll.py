@@ -12,7 +12,7 @@
 #
 # --------------------------------------------------------------------------
 
-import select, time, sys
+import select, os
 import ConfigParser
 
 # --- helper function   ----------------------------------------------------
@@ -34,6 +34,7 @@ gpio_dir = '/sys/class/gpio/gpio'+GPIO_NUMBER+'/'
 
 # --- configure PIN   -----------------------------------------------------
 
+set_value(gpio_dir + '../export', GPIO_NUMBER)
 set_value(gpio_dir + 'direction', 'in')
 set_value(gpio_dir + 'edge', GPIO_EDGE)
 
@@ -54,5 +55,5 @@ while True:
   state = fd_gpio_value.read(1)
 
   # execute command
-  sys.os.system(EXEC_ON_INT + " " + str(value) + " &")
+  os.system(EXEC_ON_INT + " " + str(state) + " &")
   
