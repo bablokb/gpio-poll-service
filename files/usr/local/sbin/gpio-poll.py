@@ -30,13 +30,14 @@ config.read('/etc/gpio-poll.conf')
 GPIO_NUMBER=config.get('GPIO','number')
 GPIO_EDGE=config.get('GPIO','edge')
 EXEC_ON_INT=config.get('GPIO','command')
-gpio_dir = '/sys/class/gpio/gpio'+GPIO_NUMBER+'/'
+gpio_root = '/sys/class/gpio/'
+gpio_dir  = gpio_root + 'gpio'+GPIO_NUMBER+'/'
 
 # --- configure PIN   -----------------------------------------------------
 
-set_value(gpio_dir + '../export', GPIO_NUMBER)
-set_value(gpio_dir + 'direction', 'in')
-set_value(gpio_dir + 'edge', GPIO_EDGE)
+set_value(gpio_root + 'export', GPIO_NUMBER)
+set_value(gpio_dir  + 'direction', 'in')
+set_value(gpio_dir  + 'edge', GPIO_EDGE)
 
 # --- create file-handle and poll-object   --------------------------------
 
