@@ -2,8 +2,8 @@
 # --------------------------------------------------------------------------
 # Script executed by systemd service for gpio-poll.service.
 #
-# Please edit /etc/gpio-poll.conf to configure the GPIO to monitor
-# and the script to be started.
+# Please edit /etc/gpio-poll.conf to configure the GPIOs to monitor
+# and the scripts to be started.
 #
 # Author: Bernhard Bablok
 # License: GPL3
@@ -12,10 +12,10 @@
 #
 # --------------------------------------------------------------------------
 
-import select, os
+import select, os, sys
 import ConfigParser
 
-# --- helper function   ----------------------------------------------------
+# --- helper functions   ---------------------------------------------------
 
 def set_value(path, value):
   fd = open(path, 'w')
@@ -23,38 +23,66 @@ def set_value(path, value):
   fd.close()
   return
 
-# --- read configuration   ------------------------------------------------
+def get_gpios(cparser):
+  gpios = cparser.get('GLOBAL','gpios')
+  return [entry.strip() for entry in gpios.split(',')]
 
-config = ConfigParser.RawConfigParser()
-config.read('/etc/gpio-poll.conf')
-GPIO_NUMBER=config.get('GPIO','number')
-GPIO_EDGE=config.get('GPIO','edge')
-EXEC_ON_INT=config.get('GPIO','command')
-gpio_root = '/sys/class/gpio/'
-gpio_dir  = gpio_root + 'gpio'+GPIO_NUMBER+'/'
+def get_config(cparser,gpios):
+  info = {}
+  for gpio in gpios:
+    section = 'GPIO'+gpio
+    command = cparser.get(section,'command')
+    edge    = cparser.get(section,'edge')
+    info[gpio] = {'command': command,
+                  'edge': edge};
+  return info
 
-# --- configure PIN   -----------------------------------------------------
+def setup_pins(info):
+  for num, entry in info.iteritems():
+    edge = entry['edge']
+    gpio_root = '/sys/class/gpio/'
+    gpio_dir  = gpio_root + 'gpio'+num+'/'
+    if not os.path.isdir(gpio_dir):
+      set_value(gpio_root + 'export', num)
+      set_value(gpio_dir  + 'direction', 'in')
+      set_value(gpio_dir  + 'edge', edge)
 
-set_value(gpio_root + 'export', GPIO_NUMBER)
-set_value(gpio_dir  + 'direction', 'in')
-set_value(gpio_dir  + 'edge', GPIO_EDGE)
+def setup_poll(info):
+  poll_obj = select.poll()
+  for num in info:
+    gpio_dir  = '/sys/class/gpio/gpio'+num+'/'
+    fd = open(gpio_dir + 'value', 'r')
+    info[num]['fd'] = fd
+    poll_obj.register(fd,select.POLLPRI)
+  return poll_obj
 
-# --- create file-handle and poll-object   --------------------------------
+# --- main program   ------------------------------------------------------
 
-fd_gpio_value = open(gpio_dir + 'value', 'r')
-poll_obj = select.poll()
-poll_obj.register(fd_gpio_value, select.POLLPRI)
+parser = ConfigParser.RawConfigParser()
+parser.read('/etc/gpio-poll.conf')
+gpios = get_gpios(parser)
+info = get_config(parser,gpios)
+
+setup_pins(info)
+poll_obj = setup_poll(info)
 
 # --- main loop   ---------------------------------------------------------
 
 while True:
   # wait for interrupt
-  events = poll_obj.poll()
+  poll_result = poll_obj.poll()
+  print poll_result
 
-  # read value
-  fd_gpio_value.seek(0)
-  state = fd_gpio_value.read(1)
+  # read values
+  for (fd,event) in poll_result:
+      os.lseek(fd,0,os.SEEK_SET)
+      state = os.read(fd,1)
 
-  # execute command
-  os.system(EXEC_ON_INT + " " + str(state) + " &")
-  
+      # get gpio-number from filename
+      name = os.readlink('/proc/self/fd/%d' % fd)
+      num  = name[-8:-6]
+
+      # execute command
+      command = info[num]['command']
+      os.system(command + " " + num + " " + str(state) + " &")
+2
