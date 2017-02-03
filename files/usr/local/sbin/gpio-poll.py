@@ -33,19 +33,23 @@ def get_config(cparser,gpios):
     section = 'GPIO'+gpio
     command = cparser.get(section,'command')
     edge    = cparser.get(section,'edge')
+    act_low = cparser.get(section,'active_low')
     info[gpio] = {'command': command,
-                  'edge': edge};
+                  'edge': edge,
+                  'act_low': act_low};
   return info
 
 def setup_pins(info):
   for num, entry in info.iteritems():
     edge = entry['edge']
+    act_low = entry['act_low']
     gpio_root = '/sys/class/gpio/'
     gpio_dir  = gpio_root + 'gpio'+num+'/'
     if not os.path.isdir(gpio_dir):
       set_value(gpio_root + 'export', num)
       set_value(gpio_dir  + 'direction', 'in')
       set_value(gpio_dir  + 'edge', edge)
+      set_value(gpio_dir  + 'active_low', act_low)
 
 def setup_poll(info):
   poll_obj = select.poll()
