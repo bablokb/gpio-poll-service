@@ -85,4 +85,3 @@ while True:
       # execute command
       command = info[num]['command']
       os.system(command + " " + num + " " + str(state) + " &")
-2
