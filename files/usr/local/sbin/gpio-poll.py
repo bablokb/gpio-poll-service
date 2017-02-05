@@ -12,10 +12,12 @@
 #
 # --------------------------------------------------------------------------
 
-import select, os, sys
+import select, os, sys, syslog
 import ConfigParser
 
 # --- helper functions   ---------------------------------------------------
+
+""" write a value to the given path """
 
 def set_value(path, value):
   fd = open(path, 'w')
@@ -23,9 +25,17 @@ def set_value(path, value):
   fd.close()
   return
 
+# --------------------------------------------------------------------------
+
+""" return the array of the configured GPIO numbers """
+
 def get_gpios(cparser):
   gpios = cparser.get('GLOBAL','gpios')
   return [entry.strip() for entry in gpios.split(',')]
+
+# --------------------------------------------------------------------------
+
+""" parse configuration """
 
 def get_config(cparser,gpios):
   info = {}
@@ -34,10 +44,16 @@ def get_config(cparser,gpios):
     command = cparser.get(section,'command')
     edge    = cparser.get(section,'edge')
     act_low = cparser.get(section,'active_low')
+    ig_init = cparser.get(section,'ignore_inital')
     info[gpio] = {'command': command,
                   'edge': edge,
-                  'act_low': act_low};
+                  'ig_init': ig_init,
+                  'act_low': act_low}
   return info
+
+# --------------------------------------------------------------------------
+
+""" configure GPIOs """
 
 def setup_pins(info):
   for num, entry in info.iteritems():
@@ -51,41 +67,52 @@ def setup_pins(info):
       set_value(gpio_dir  + 'edge', edge)
       set_value(gpio_dir  + 'active_low', act_low)
 
+# --------------------------------------------------------------------------
+
+""" setup poll-object and register file-descriptors """
+
 def setup_poll(info):
   poll_obj = select.poll()
+  fdmap = {}
   for num in info:
     gpio_dir  = '/sys/class/gpio/gpio'+num+'/'
-    fd = open(gpio_dir + 'value', 'r')
-    info[num]['fd'] = fd
-    poll_obj.register(fd,select.POLLPRI)
-  return poll_obj
+    fd  = open(gpio_dir + 'value', 'r')
+    fno = fd.fileno()
+    fdmap[fno] = { 'num': num, 'fd': fd }   # keep ref to fd to prevent
+    poll_obj.register(fd,select.POLLPRI)    # garbage collection
+  return poll_obj, fdmap
 
 # --- main program   ------------------------------------------------------
 
+syslog.openlog("gpio-poll")
 parser = ConfigParser.RawConfigParser()
 parser.read('/etc/gpio-poll.conf')
+
 gpios = get_gpios(parser)
+syslog.syslog("GPIOs: " + gpios)
+
 info = get_config(parser,gpios)
 
 setup_pins(info)
-poll_obj = setup_poll(info)
+poll_obj, fdmap = setup_poll(info)
 
 # --- main loop   ---------------------------------------------------------
 
 while True:
   # wait for interrupt
   poll_result = poll_obj.poll()
-  print poll_result
 
   # read values
   for (fd,event) in poll_result:
-      os.lseek(fd,0,os.SEEK_SET)
-      state = os.read(fd,1)
+    syslog.syslog("processing fd %s (event: %d)" % (fd,event))
+    os.lseek(fd,0,os.SEEK_SET)
+    state = os.read(fd,1)
 
-      # get gpio-number from filename
-      name = os.readlink('/proc/self/fd/%d' % fd)
-      num  = name[-8:-6]
+    # get gpio-number from filename
+    num = fdmap[fd]['num']
+    syslog.syslog("state[%d]: %d" % (num,state))
 
-      # execute command
-      command = info[num]['command']
-      os.system(command + " " + num + " " + str(state) + " &")
+    # execute command
+    command = info[num]['command']
+    syslog.syslog("executing %s" % command)
+    os.system(command + " " + num + " " + str(state) + " &")
