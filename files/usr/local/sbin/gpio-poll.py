@@ -12,7 +12,7 @@
 #
 # --------------------------------------------------------------------------
 
-import select, os, sys, syslog
+import select, os, sys, syslog, signal
 import ConfigParser
 
 # --- helper functions   ---------------------------------------------------
@@ -56,10 +56,10 @@ def get_config(cparser,gpios):
 """ configure GPIOs """
 
 def setup_pins(info):
+  gpio_root = '/sys/class/gpio/'
   for num, entry in info.iteritems():
     edge = entry['edge']
     act_low = entry['act_low']
-    gpio_root = '/sys/class/gpio/'
     gpio_dir  = gpio_root + 'gpio'+num+'/'
     if not os.path.isdir(gpio_dir):
       set_value(gpio_root + 'export', num)
@@ -82,7 +82,18 @@ def setup_poll(info):
     poll_obj.register(fd,select.POLLPRI)    # garbage collection
   return poll_obj, fdmap
 
-# --- main program   ------------------------------------------------------
+# --------------------------------------------------------------------------
+
+""" signal-handler to cleanup GPIOs """
+
+def signal_handler(_signo, _stack_frame):
+  global info
+  gpio_root = '/sys/class/gpio/'
+  for num, entry in info.iteritems():
+    set_value(gpio_root + 'unexport', num)
+  Raises SystemExit(0):
+
+ # --- main program   ------------------------------------------------------
 
 syslog.openlog("gpio-poll")
 parser = ConfigParser.RawConfigParser()
@@ -93,7 +104,10 @@ syslog.syslog("GPIOs: " + gpios)
 
 info = get_config(parser,gpios)
 
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 setup_pins(info)
+
 poll_obj, fdmap = setup_poll(info)
 
 # --- main loop   ---------------------------------------------------------
