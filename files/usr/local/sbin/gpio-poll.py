@@ -27,11 +27,19 @@ def set_value(path, value):
 
 # --------------------------------------------------------------------------
 
-""" return the array of the configured GPIO numbers """
+def write_log(msg):
+  global debug
+  if debug == 1:
+    syslog.syslog(msg)
 
-def get_gpios(cparser):
+# --------------------------------------------------------------------------
+
+""" return global configurations (debug, array of configured GPIOs) """
+
+def get_global(cparser):
   gpios = cparser.get('GLOBAL','gpios')
-  return [entry.strip() for entry in gpios.split(',')]
+  debug = cparser.get('GLOBAL','debug')
+  return debug, [entry.strip() for entry in gpios.split(',')]
 
 # --------------------------------------------------------------------------
 
@@ -44,7 +52,7 @@ def get_config(cparser,gpios):
     command = cparser.get(section,'command')
     edge    = cparser.get(section,'edge')
     act_low = cparser.get(section,'active_low')
-    ig_init = cparser.get(section,'ignore_inital')
+    ig_init = cparser.get(section,'ignore_initial')
     info[gpio] = {'command': command,
                   'edge': edge,
                   'ig_init': ig_init,
@@ -78,6 +86,10 @@ def setup_poll(info):
     gpio_dir  = '/sys/class/gpio/gpio'+num+'/'
     fd  = open(gpio_dir + 'value', 'r')
     fno = fd.fileno()
+    # read and discard state in case ignore_initial is set
+    if info[num]['ig_init'] == 1:
+      fd.seek(0)
+      fd.read(1)
     fdmap[fno] = { 'num': num, 'fd': fd }   # keep ref to fd to prevent
     poll_obj.register(fd,select.POLLPRI)    # garbage collection
   return poll_obj, fdmap
@@ -96,11 +108,14 @@ def signal_handler(_signo, _stack_frame):
  # --- main program   ------------------------------------------------------
 
 syslog.openlog("gpio-poll")
-parser = ConfigParser.RawConfigParser()
+parser = ConfigParser.RawConfigParser({'debug': 0,
+                                       'ignore_initial': 0,
+                                       'active_low': 0,
+                                       'edge': 'both'})
 parser.read('/etc/gpio-poll.conf')
 
-gpios = get_gpios(parser)
-syslog.syslog("GPIOs: " + gpios)
+debug, gpios = get_global(parser)
+write_log("GPIOs: " + gpios)
 
 info = get_config(parser,gpios)
 
@@ -118,15 +133,15 @@ while True:
 
   # read values
   for (fd,event) in poll_result:
-    syslog.syslog("processing fd %s (event: %d)" % (fd,event))
+    write_log("processing fd %s (event: %d)" % (fd,event))
     os.lseek(fd,0,os.SEEK_SET)
     state = os.read(fd,1)
 
     # get gpio-number from filename
     num = fdmap[fd]['num']
-    syslog.syslog("state[%d]: %d" % (num,state))
+    write_log("state[%d]: %d" % (num,state))
 
     # execute command
     command = info[num]['command']
-    syslog.syslog("executing %s" % command)
+    write_log("executing %s" % command)
     os.system(command + " " + num + " " + str(state) + " &")
