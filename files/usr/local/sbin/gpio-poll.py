@@ -29,7 +29,7 @@ def set_value(path, value):
 
 def write_log(msg):
   global debug
-  if debug == 1:
+  if debug == '1':
     syslog.syslog(msg)
 
 # --------------------------------------------------------------------------
@@ -87,7 +87,8 @@ def setup_poll(info):
     fd  = open(gpio_dir + 'value', 'r')
     fno = fd.fileno()
     # read and discard state in case ignore_initial is set
-    if info[num]['ig_init'] == 1:
+    if info[num]['ig_init'] == '1':
+      write_log("ignoring initial value for %s" % num)
       fd.seek(0)
       fd.read(1)
     fdmap[fno] = { 'num': num, 'fd': fd }   # keep ref to fd to prevent
@@ -99,25 +100,27 @@ def setup_poll(info):
 """ signal-handler to cleanup GPIOs """
 
 def signal_handler(_signo, _stack_frame):
+  write_log("interrupt %d detected, exiting" % _signo)
   global info
   gpio_root = '/sys/class/gpio/'
   for num, entry in info.iteritems():
     set_value(gpio_root + 'unexport', num)
-  Raises SystemExit(0):
+  sys.exit(0)
 
  # --- main program   ------------------------------------------------------
 
 syslog.openlog("gpio-poll")
-parser = ConfigParser.RawConfigParser({'debug': 0,
-                                       'ignore_initial': 0,
-                                       'active_low': 0,
+parser = ConfigParser.RawConfigParser({'debug': '0',
+                                       'ignore_initial': '0',
+                                       'active_low': '0',
                                        'edge': 'both'})
 parser.read('/etc/gpio-poll.conf')
 
 debug, gpios = get_global(parser)
-write_log("GPIOs: " + gpios)
+write_log("GPIOs: " + str(gpios))
 
 info = get_config(parser,gpios)
+write_log("Config: " + str(info))
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
@@ -139,7 +142,7 @@ while True:
 
     # get gpio-number from filename
     num = fdmap[fd]['num']
-    write_log("state[%d]: %d" % (num,state))
+    write_log("state[%s]: %s" % (num,state))
 
     # execute command
     command = info[num]['command']
