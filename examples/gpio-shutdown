@@ -4,10 +4,10 @@
 #
 # This script initiates or cancels shutdown and notifies the desktop user.
 #
-# Required packages: libnotify-bin, libnotify-daemon
+# Required packages: libnotify-bin, notification-daemon
 #
 # You should copy this script to /usr/local/sbin and
-# add the following configuration to /etc/gpio-poll.conf:
+# add the following configuration to /etc/gpio-poll.conf (configure to your taste)
 #
 # [GLOBAL]
 # gpios: 27
