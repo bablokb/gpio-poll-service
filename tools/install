@@ -21,6 +21,12 @@ fi
 
 # --- install specific files   ----------------------------------------------
 
+rand="$RANDOM"
+if [ -f /etc/gpio-poll.conf ]; then
+  # save current configuration
+  mv /etc/gpio-poll.conf /etc/gpio-poll.conf.$rand
+fi
+
 for f in `find $(dirname "$0")/../files/ -type f`; do
   cp "$f" "${f#*files}"
   chown root:root "${f#*files}"
@@ -28,6 +34,13 @@ done
 chmod 755 /usr/local/sbin/gpio-poll.py
 chmod 644 /etc/gpio-poll.conf
 chmod 644 /etc/systemd/system/gpio-poll.service
+
+# restore old configuration
+if [ -f /etc/gpio-poll.conf.$rand ]; then
+  mv -f /etc/gpio-poll.conf /etc/gpio-poll.conf.new
+  mv /etc/gpio-poll.conf.$rand /etc/gpio-poll.conf
+  echo -e "\nnew version of configuration file: /etc/gpio-poll.conf.new"
+fi
 
 # --- activate service   ----------------------------------------------------
 
