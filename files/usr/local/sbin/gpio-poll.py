@@ -139,9 +139,9 @@ while True:
     write_log("processing fd %s (event: %d)" % (fd,event))
 
     # do some sanity checks
-    if event == select.POLLIN:
+    if event & select.POLLIN == select.POLLIN:
       write_log("event POLLIN not expected. Reading anyhow")
-    elif event != select.POLLRPI:
+    elif event & select.POLLPRI != select.POLLPRI:
       write_log("event not POLLIN/POLLPRI. Ignoring event")
       continue
 
@@ -155,10 +155,14 @@ while True:
     gpio_info = info[num]
 
     # check for invalid value (this does happen)
-    if gpio_info['direction'] == 'rising':
-      if state == '0': continue
-    elif gpio_info['direction'] == 'falling':
-      if state == '1': continue
+    if gpio_info['edge'] == 'rising':
+      if state == '0':
+        write_log("invalid state for edge==rising. Ignoring")
+        continue
+    elif gpio_info['edge'] == 'falling':
+      if state == '1':
+        write_log("invalid state for edge==falling. Ignoring")
+        continue
 
     # execute command
     command = gpio_info['command']
