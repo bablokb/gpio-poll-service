@@ -137,6 +137,11 @@ while True:
   # read values
   for (fd,event) in poll_result:
     write_log("processing fd %s (event: %d)" % (fd,event))
+    if event == select.POLLIN:
+      write_log("event POLLIN not expected. Reading anyhow")
+    elif event != select.POLLRPI:
+      write_log("event not POLLIN/POLLPRI. Ignoring event")
+      continue
     os.lseek(fd,0,os.SEEK_SET)
     state = os.read(fd,1)
 
