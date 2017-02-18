@@ -29,6 +29,7 @@ To start the service (after proper configuration), run
 
 This will also happen after a reboot automatically.
 
+
 Configuration
 -------------
 
@@ -37,7 +38,7 @@ has one `[GLOBAL]` section which lists the GPIOs to monitor, and which
 enables to set a debug-flag. If the latter is `1`, the service will
 write various messages to the system log.
 
-For every GPIO listet in the global section, you have to add an individual
+For every GPIO listed in the global section, you have to add an individual
 section named `[GPIOxx]` with xx being the number of the GPIO.
 
 The service supports the following parameters for every section:
@@ -49,9 +50,11 @@ The service supports the following parameters for every section:
 
 The `command` is called with two parameters: the pin number and the current
 value (`0` or `1`). Note that unless you set `ignore_initial: 1` the interrupt
-will also trigger on startup and call the configured command. This will
-happen in any case. E.g. even if you configured `edge: rising` and the
-initial state is `0` your command will be called with a value of `0` once.
+will also trigger on startup and call the configured command.
+
+Since the "edge"-configuration does not work without faults, the service
+will filter all invalid values read from the GPIO (e.g. if edge==rsing it
+will filter all states read with value=0).
 
 
 Examples
