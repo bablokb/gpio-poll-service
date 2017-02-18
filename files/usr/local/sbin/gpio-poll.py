@@ -143,8 +143,15 @@ while True:
     # get gpio-number from filename
     num = fdmap[fd]['num']
     write_log("state[%s]: %s" % (num,state))
+    gpio_info = info[num]
+
+    # check for invalid value (this does happen)
+    if gpio_info['direction'] == 'rising':
+      if state == '0': continue
+    elif gpio_info['direction'] == 'falling':
+      if state == '1': continue
 
     # execute command
-    command = info[num]['command']
+    command = gpio_info['command']
     write_log("executing %s" % command)
     os.system(command + " " + num + " " + str(state) + " &")
