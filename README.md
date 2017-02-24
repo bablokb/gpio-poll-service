@@ -48,8 +48,24 @@ The service supports the following parameters for every section:
   - `ignore_initial`: don't report initial state
   - `command`: the command to execute on interrupt
 
-The `command` is called with two parameters: the pin number and the current
-value (`0` or `1`). Note that unless you set `ignore_initial: 1` the interrupt
+The `command` is called with four parameters:
+
+  - the pin number
+  - the current value (`0` or `1`).
+  - the *switch time* (time since last interrupt with opposite value)
+  - the *repeat time* (time since last interrupt with the same value)
+
+If you use the timing values (e.g. to check if a button was pressed for
+at least five seconds) you should apply some sanity checks. Timings of
+the first reported interrupt are measured from service startup and are
+therefore probably meaningless. Also, switch time is only relevant if
+edge=both.
+
+Be aware that time values are not strictly increasing and during system
+startup you might have to expect larger jumps in time values
+(especially if a Pi updates it's time via ntp).
+
+Note that unless you set `ignore_initial: 1` the interrupt
 will also trigger on startup and call the configured command.
 
 Since the "edge"-configuration does not work without faults, the service
