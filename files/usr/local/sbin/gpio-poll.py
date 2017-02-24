@@ -12,7 +12,7 @@
 #
 # --------------------------------------------------------------------------
 
-import select, os, sys, syslog, signal
+import select, os, sys, syslog, signal, time
 import ConfigParser
 
 # --- helper functions   ---------------------------------------------------
@@ -47,6 +47,7 @@ def get_global(cparser):
 
 def get_config(cparser,gpios):
   info = {}
+  now = time.time()
   for gpio in gpios:
     section = 'GPIO'+gpio
     command = cparser.get(section,'command')
@@ -56,7 +57,9 @@ def get_config(cparser,gpios):
     info[gpio] = {'command': command,
                   'edge': edge,
                   'ig_init': ig_init,
-                  'act_low': act_low}
+                  'act_low': act_low,
+                  '0':       now,             # timestamp value 0
+                  '1':       now}             # timestamp value 1
   return info
 
 # --------------------------------------------------------------------------
@@ -71,9 +74,9 @@ def setup_pins(info):
     gpio_dir  = gpio_root + 'gpio'+num+'/'
     if not os.path.isdir(gpio_dir):
       set_value(gpio_root + 'export', num)
-      set_value(gpio_dir  + 'direction', 'in')
-      set_value(gpio_dir  + 'edge', edge)
-      set_value(gpio_dir  + 'active_low', act_low)
+    set_value(gpio_dir  + 'direction', 'in')
+    set_value(gpio_dir  + 'edge', edge)
+    set_value(gpio_dir  + 'active_low', act_low)
 
 # --------------------------------------------------------------------------
 
@@ -133,6 +136,7 @@ poll_obj, fdmap = setup_poll(info)
 while True:
   # wait for interrupt
   poll_result = poll_obj.poll()
+  ts_current = time.time()
 
   # read values
   for (fd,event) in poll_result:
@@ -147,24 +151,33 @@ while True:
 
     # read current state of GPIO
     os.lseek(fd,0,os.SEEK_SET)
-    state = os.read(fd,1)
+    state = int(os.read(fd,1))
 
     # get gpio-number from filename
     num = fdmap[fd]['num']
-    write_log("state[%s]: %s" % (num,state))
+    write_log("state[%s]: %d" % (num,state))
     gpio_info = info[num]
 
     # check for invalid value (this does happen)
     if gpio_info['edge'] == 'rising':
-      if state == '0':
-        write_log("invalid state for edge==rising. Ignoring")
+      if state == 0:
+        write_log("invalid state %d for edge==rising. Ignoring" % state)
         continue
     elif gpio_info['edge'] == 'falling':
-      if state == '1':
-        write_log("invalid state for edge==falling. Ignoring")
+      if state == 1:
+        write_log("invalid state %d for edge==falling. Ignoring" % state)
         continue
+
+    # calculate intervals
+    int_repeat = ts_current - gpio_info[str(state)]
+    if gpio_info['edge'] == 'both':
+      int_switch = ts_current - gpio_info[str(1-state)]
+    else:
+      int_switch = -1
+
+    gpio_info[str(state)] = ts_current
 
     # execute command
     command = gpio_info['command']
     write_log("executing %s" % command)
-    os.system(command + " " + num + " " + str(state) + " &")
+    os.system("%s %s %d %g %g &" % (command,num,state,int_switch,int_repeat))
