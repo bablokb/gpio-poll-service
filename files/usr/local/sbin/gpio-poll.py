@@ -38,8 +38,20 @@ def write_log(msg):
 
 def get_global(cparser):
   gpios = cparser.get('GLOBAL','gpios')
-  debug = cparser.get('GLOBAL','debug')
-  return debug, [entry.strip() for entry in gpios.split(',')]
+  debug = get_value(cparser,'GLOBAL','debug','0')
+  fifo  = get_value(cparser,'GLOBAL','fifo','0')
+  return debug, fifo, [entry.strip() for entry in gpios.split(',')]
+
+# --------------------------------------------------------------------------
+
+""" get value of config-variable and return given default if unset """
+
+def get_value(cparser,section,option,default):
+  try:
+    value = cparser.get(section,option)
+  except:
+    value = default
+  return value
 
 # --------------------------------------------------------------------------
 
@@ -49,17 +61,19 @@ def get_config(cparser,gpios):
   info = {}
   now = time.time()
   for gpio in gpios:
-    section = 'GPIO'+gpio
-    command = cparser.get(section,'command')
-    edge    = cparser.get(section,'edge')
-    act_low = cparser.get(section,'active_low')
-    ig_init = cparser.get(section,'ignore_initial')
+    section   = 'GPIO'+gpio
+    command   = cparser.get(section,'command')
+    edge      = get_value(cparser,section,'edge','both')
+    act_low   = get_value(cparser,section,'active_low','0')
+    ig_init   = get_value(cparser,section,'ignore_initial','0')
+    min_delay = get_value(cparser,section,'min_delay','0')
     info[gpio] = {'command': command,
-                  'edge': edge,
-                  'ig_init': ig_init,
-                  'act_low': act_low,
-                  '0':       now,             # timestamp value 0
-                  '1':       now}             # timestamp value 1
+                  'edge':      edge,
+                  'ig_init':   ig_init,
+                  'act_low':   act_low,
+                  'min_delay': min_delay,
+                  '0':         now,             # timestamp value 0
+                  '1':         now}             # timestamp value 1
   return info
 
 # --------------------------------------------------------------------------
@@ -119,7 +133,7 @@ parser = ConfigParser.RawConfigParser({'debug': '0',
                                        'edge': 'both'})
 parser.read('/etc/gpio-poll.conf')
 
-debug, gpios = get_global(parser)
+debug, fifo, gpios = get_global(parser)
 write_log("GPIOs: " + str(gpios))
 
 info = get_config(parser,gpios)
