@@ -205,14 +205,23 @@ while True:
         write_log("invalid state %d for edge==falling. Ignoring" % state)
         continue
 
-    # calculate intervals
+    # calculate intervals ...
     int_repeat = ts_current - gpio_info[str(state)]
     if gpio_info['edge'] == 'both':
       int_switch = ts_current - gpio_info[str(1-state)]
     else:
       int_switch = -1
 
+    # check for bouncing
+    bounce_limit = float(gpio_info['bounce_time'])
+    if  bounce_limit > 0.0:
+      if int_repeat < bounce_limit:
+        write_log"ignoring event (repeat-time less than bounce_time)"
+        continue
+
+    # ...and update current timestamp
     gpio_info[str(state)] = ts_current
+
 
     # execute command
     command = gpio_info['command']
