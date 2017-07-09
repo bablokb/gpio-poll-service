@@ -44,11 +44,11 @@ def get_global(cparser):
     'fifo' :      get_value(cparser,'GLOBAL','fifo','0'),
 
     # defaults for gpio-sections
-    'command':    get_value(cparser,'GLOBAL','command',None),
-    'edge':       get_value(cparser,'GLOBAL','edge','both'),
-    'act_low:'    get_value(cparser,'GLOBAL','active_low','0'),
-    'ig_init':    get_value(cparser,'GLOBAL','ignore_initial','0'),
-    'min_delay':  get_value(cparser,'GLOBAL','min_delay','0'),
+    'command':     get_value(cparser,'GLOBAL','command',None),
+    'edge':        get_value(cparser,'GLOBAL','edge','both'),
+    'act_low:'     get_value(cparser,'GLOBAL','active_low','0'),
+    'ig_init':     get_value(cparser,'GLOBAL','ignore_initial','0'),
+    'bounce_time': get_value(cparser,'GLOBAL','bounce_time','0'),
 
     # list of gpios
     'gpios':      [entry.strip() for entry in gpios.split(',')]
@@ -82,12 +82,13 @@ def get_config(cparser,global_conf):
                           global_conf['active_low'])
     ig_init   = get_value(cparser,section,'ignore_initial',
                           global_conf['ignore_initial'])
-    min_delay = get_value(cparser,section,'min_delay',global_conf['min_delay'])
-    info[gpio] = {'command': command,
-                  'edge':      edge,
-                  'ig_init':   ig_init,
-                  'act_low':   act_low,
-                  'min_delay': min_delay,
+    bounce_time = get_value(cparser,section,'bounce_time',
+                             global_conf['bounce_time'])
+    info[gpio] = {'command':     command,
+                  'edge':        edge,
+                  'ig_init':     ig_init,
+                  'act_low':     act_low,
+                  'bounce_time': bounce_time,
                   '0':         now,             # timestamp value 0
                   '1':         now}             # timestamp value 1
   return info
