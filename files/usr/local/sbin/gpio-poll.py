@@ -39,9 +39,19 @@ def write_log(msg):
 def get_global(cparser):
   gpios = cparser.get('GLOBAL','gpios')
   global_conf = {
-    'debug':  get_value(cparser,'GLOBAL','debug','0'),
-    'fifo' :  get_value(cparser,'GLOBAL','fifo','0'),
-    'gpios':  [entry.strip() for entry in gpios.split(',')]
+    # global constants
+    'debug':      get_value(cparser,'GLOBAL','debug','0'),
+    'fifo' :      get_value(cparser,'GLOBAL','fifo','0'),
+
+    # defaults for gpio-sections
+    'command':    get_value(cparser,'GLOBAL','command',None),
+    'edge':       get_value(cparser,'GLOBAL','edge','both'),
+    'act_low:'    get_value(cparser,'GLOBAL','active_low','0'),
+    'ig_init':    get_value(cparser,'GLOBAL','ignore_initial','0'),
+    'min_delay':  get_value(cparser,'GLOBAL','min_delay','0'),
+
+    # list of gpios
+    'gpios':      [entry.strip() for entry in gpios.split(',')]
   }
   return global_conf
 
@@ -60,16 +70,19 @@ def get_value(cparser,section,option,default):
 
 """ parse configuration """
 
-def get_config(cparser,gpios):
+def get_config(cparser,global_conf):
+  gpios = global_conf['gpios']
   info = {}
   now = time.time()
   for gpio in gpios:
     section   = 'GPIO'+gpio
-    command   = cparser.get(section,'command')
-    edge      = get_value(cparser,section,'edge','both')
-    act_low   = get_value(cparser,section,'active_low','0')
-    ig_init   = get_value(cparser,section,'ignore_initial','0')
-    min_delay = get_value(cparser,section,'min_delay','0')
+    command   = get_value(section,'command',global_conf['command'])
+    edge      = get_value(cparser,section,'edge',global_conf['edge'])
+    act_low   = get_value(cparser,section,'active_low',
+                          global_conf['active_low'])
+    ig_init   = get_value(cparser,section,'ignore_initial',
+                          global_conf['ignore_initial'])
+    min_delay = get_value(cparser,section,'min_delay',global_conf['min_delay'])
     info[gpio] = {'command': command,
                   'edge':      edge,
                   'ig_init':   ig_init,
@@ -134,21 +147,24 @@ parser = ConfigParser.RawConfigParser({'debug': '0',
                                        'ignore_initial': '0',
                                        'active_low': '0',
                                        'edge': 'both'})
+# read configuration
 parser.read('/etc/gpio-poll.conf')
-
 global_conf = get_global(parser)
 debug = global_conf['debug']
+info = get_config(parser,global_conf)
+
+# dump configuration to system log
+write_log("Global-config: " + str(global_conf))
 gpios = global_conf['gpios']
-
 write_log("GPIOs: " + str(gpios))
+write_log("Config-gpios: " + str(info))
 
-info = get_config(parser,gpios)
-write_log("Config: " + str(info))
-
+# setup signal handlers and pins
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 setup_pins(info)
 
+# setup poll
 poll_obj, fdmap = setup_poll(info)
 
 # --- main loop   ---------------------------------------------------------
