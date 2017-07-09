@@ -225,5 +225,6 @@ while True:
 
     # execute command
     command = gpio_info['command']
-    write_log("executing %s" % command)
-    os.system("%s %s %d %g %g &" % (command,num,state,int_switch,int_repeat))
+    if command:
+      write_log("executing %s" % command)
+      os.system("%s %s %d %g %g &" % (command,num,state,int_switch,int_repeat))
