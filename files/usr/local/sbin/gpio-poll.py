@@ -15,6 +15,8 @@
 import select, os, sys, syslog, signal, time
 import ConfigParser
 
+FIFO_NAME="/var/run/gpio-poll.fifo"
+
 # --- helper functions   ---------------------------------------------------
 
 """ write a value to the given path """
@@ -139,6 +141,8 @@ def signal_handler(_signo, _stack_frame):
   gpio_root = '/sys/class/gpio/'
   for num, entry in info.iteritems():
     set_value(gpio_root + 'unexport', num)
+  if global_conf['fifo'] != '0':
+    fifo.close()
   sys.exit(0)
 
  # --- main program   ------------------------------------------------------
@@ -167,6 +171,14 @@ setup_pins(info)
 
 # setup poll
 poll_obj, fdmap = setup_poll(info)
+
+# setup fifo
+if global_conf['fifo'] != '0':
+  write_log("creating fifo %s" % FIFO_NAME)
+  if os.path.exists(FIFO_NAME):
+    os.unlink(FIFO_NAME)
+  os.mkfifo(FIFO_NAME,0644)
+  fifo = open(FIFO_NAME,"w")
 
 # --- main loop   ---------------------------------------------------------
 
@@ -223,8 +235,15 @@ while True:
     gpio_info[str(state)] = ts_current
 
 
-    # execute command
-    command = gpio_info['command']
-    if command:
-      write_log("executing %s" % command)
-      os.system("%s %s %d %g %g &" % (command,num,state,int_switch,int_repeat))
+    # in fifo-mode, write to fifo
+    if global_conf['fifo'] != '0':
+      write_log("writing event to fifo")
+      fifo.write("%s %d %g %g\n" % (num,state,int_switch,int_repeat))
+    else:
+      # execute command
+      command = gpio_info['command']
+      if command:
+        write_log("executing %s" % command)
+        os.system("%s %s %d %g %g &" % (command,num,state,int_switch,int_repeat))
+      else:
+        write_log("command not defined, ignoring event")
