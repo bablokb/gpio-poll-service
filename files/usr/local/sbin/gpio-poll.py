@@ -38,9 +38,12 @@ def write_log(msg):
 
 def get_global(cparser):
   gpios = cparser.get('GLOBAL','gpios')
-  debug = get_value(cparser,'GLOBAL','debug','0')
-  fifo  = get_value(cparser,'GLOBAL','fifo','0')
-  return debug, fifo, [entry.strip() for entry in gpios.split(',')]
+  global_conf = {
+    'debug':  get_value(cparser,'GLOBAL','debug','0'),
+    'fifo' :  get_value(cparser,'GLOBAL','fifo','0'),
+    'gpios':  [entry.strip() for entry in gpios.split(',')]
+  }
+  return global_conf
 
 # --------------------------------------------------------------------------
 
@@ -133,7 +136,10 @@ parser = ConfigParser.RawConfigParser({'debug': '0',
                                        'edge': 'both'})
 parser.read('/etc/gpio-poll.conf')
 
-debug, fifo, gpios = get_global(parser)
+global_conf = get_global(parser)
+debug = global_conf['debug']
+gpios = global_conf['gpios']
+
 write_log("GPIOs: " + str(gpios))
 
 info = get_config(parser,gpios)
