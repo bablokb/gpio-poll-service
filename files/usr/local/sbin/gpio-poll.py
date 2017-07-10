@@ -66,11 +66,15 @@ def get_global(cparser):
 """ get value of config-variable and return given default if unset """
 
 def get_value(cparser,section,option,default):
-  try:
-    value = cparser.get(section,option)
-  except:
-    write_log("option %s not in [%s]. Using default: %s" % (option,section,default))
-    value = default
+  if cparser.has_section(section):
+    try:
+      value = cparser.get(section,option)
+    except:
+      write_log("option %s not in [%s]. Using default: %s" % (option,section,default))
+      value = default
+  else:
+      write_log("no section [%s]. Using default for %s: %s" % (section,option,default))
+      value = default
   return value
 
 # --------------------------------------------------------------------------
@@ -90,7 +94,8 @@ def get_config(cparser,global_conf):
     ig_init   = get_value(cparser,section,'ignore_initial',
                           global_conf['ig_init'])
     bounce_time = get_value(cparser,section,'bounce_time',
-                             global_conf['bounce_time'])
+                            global_conf['bounce_time'])
+
     info[gpio] = {'command':     command,
                   'edge':        edge,
                   'ig_init':     ig_init,
