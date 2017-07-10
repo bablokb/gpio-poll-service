@@ -147,7 +147,7 @@ def setup_poll(info):
 
 def signal_handler(_signo, _stack_frame):
   write_log("interrupt %d detected, exiting" % _signo)
-  global info
+  global info, fifo
   gpio_root = '/sys/class/gpio/'
   for num, entry in info.iteritems():
     set_value(gpio_root + 'unexport', num)
@@ -186,7 +186,7 @@ if global_conf['fifo'] != '0':
   if os.path.exists(FIFO_NAME):
     os.unlink(FIFO_NAME)
   os.mkfifo(FIFO_NAME,0644)
-  fifo = open(FIFO_NAME,"w")
+  fifo = open(FIFO_NAME,"rw+",0)
 
 # --- main loop   ---------------------------------------------------------
 
@@ -237,7 +237,7 @@ while True:
     if  bounce_limit > 0.0:
       if int_repeat < bounce_limit:
         write_log("ignoring event (repeat-time %g less than bounce_time %g)"
-                  % (int_repeat,bounce_limit)))
+                  % (int_repeat,bounce_limit))
         continue
 
     # ...and update current timestamp
