@@ -5,9 +5,25 @@ What it is
 ----------
 
 This project implements a systemd service polling one or more GPIO-pins
-for an interrupt (i.e. a value change). Technically, it does not poll
-but uses the same named system-call, so the service does not consume
-any ressources.
+for an interrupt (i.e. a value change). For every interrupt, it either
+calls a configured program, or writes the event into a fifo (pipe).
+
+Technically, the service does not poll but uses the same named system-call,
+so the service does not consume any ressources.
+
+
+Version Juli 10, 2017
+---------------------
+
+  - new global configuration option *fifo*
+  - new gpio-specific configuration option *bounce_time*
+  - it is now possible to set global defaults for gpio-specific options
+
+
+Version February 24, 2017
+-------------------------
+
+Initial version.
 
 Installation
 ------------
@@ -34,19 +50,37 @@ Configuration
 -------------
 
 To configure the service, you have to edit `/etc/gpio-poll.conf`. This file
-has one `[GLOBAL]` section which lists the GPIOs to monitor, and which
-enables to set a debug-flag. If the latter is `1`, the service will
-write various messages to the system log.
+has one `[GLOBAL]` section for
+
+  - global options
+  - defaults for gpio-specific options
+  - list of gpios to monitor
+
+Global options are:
+
+  - `debug`: if set to `1`, the service will write various messages
+     to the system log
+  - `fifo`: if set to `1`, the service will write all events to the
+     fifo `/var/run/gpio-poll.fifo` instead of executing gpio-specific
+     commands
 
 For every GPIO listed in the global section, you have to add an individual
-section named `[GPIOxx]` with xx being the number of the GPIO.
+section named `[GPIOxx]` with xx being the number of the GPIO. If you
+omit the section, the service configures the global defaults for the pin.
 
 The service supports the following parameters for every section:
 
   - `active_low`: this configures the value-state of the pin if set to low
   - `edge`: detect changes. Can be either `both`, `rising` or `falling`
   - `ignore_initial`: don't report initial state
-  - `command`: the command to execute on interrupt
+  - `bounce_time`: if not null, ignore all events within the given time
+     range in seconds for this pin.
+  - `command`: the command to execute on interrupt (ignored if global option
+     `fifo` is `1`)
+
+For all these values you can set defaults in the global section. So if
+you want to monitor multiple gpios and process them identically, you just
+need to list the options once in the global section.
 
 The `command` is called with four parameters:
 
@@ -72,6 +106,21 @@ Since the "edge"-configuration does not work without faults, the service
 will filter all invalid values read from the GPIO (e.g. if edge==rsing it
 will filter all states read with value=0).
 
+
+Fifo mode vs. command mode
+--------------------------
+
+Using the global option `fifo` prevents the asynchronous execution of the
+gpio-specific commands. All events are written in first-in-first-out order
+to the fifo (pipe) `/var/run/gpio-poll.fifo`. To consume the events, create a
+program that reads from the pipe and processes the events.
+
+Since the gpio-poll service runs as root, all commands are executed with
+root permission. Using a pipe, you can consume the events from programs
+running with user-level permissions.
+
+The directory `examples/fifo-test` contains a simple bash-script reading
+from the named pipe.
 
 Examples
 --------
