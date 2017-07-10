@@ -39,16 +39,20 @@ def write_log(msg):
 """ return global configurations (debug, array of configured GPIOs) """
 
 def get_global(cparser):
+  # read debug first, so that get_value can write to log
+  global debug
+  debug = get_value(cparser,'GLOBAL','debug','0')
   gpios = cparser.get('GLOBAL','gpios')
+
   global_conf = {
     # global constants
-    'debug':      get_value(cparser,'GLOBAL','debug','0'),
+    'debug':      debug,
     'fifo' :      get_value(cparser,'GLOBAL','fifo','0'),
 
     # defaults for gpio-sections
     'command':     get_value(cparser,'GLOBAL','command',None),
     'edge':        get_value(cparser,'GLOBAL','edge','both'),
-    'act_low:'     get_value(cparser,'GLOBAL','active_low','0'),
+    'act_low':     get_value(cparser,'GLOBAL','active_low','0'),
     'ig_init':     get_value(cparser,'GLOBAL','ignore_initial','0'),
     'bounce_time': get_value(cparser,'GLOBAL','bounce_time','0'),
 
@@ -65,6 +69,7 @@ def get_value(cparser,section,option,default):
   try:
     value = cparser.get(section,option)
   except:
+    write_log("option %s not in [%s]. Using default: %s" % (option,section,default))
     value = default
   return value
 
@@ -78,12 +83,12 @@ def get_config(cparser,global_conf):
   now = time.time()
   for gpio in gpios:
     section   = 'GPIO'+gpio
-    command   = get_value(section,'command',global_conf['command'])
+    command   = get_value(cparser,section,'command',global_conf['command'])
     edge      = get_value(cparser,section,'edge',global_conf['edge'])
     act_low   = get_value(cparser,section,'active_low',
-                          global_conf['active_low'])
+                          global_conf['act_low'])
     ig_init   = get_value(cparser,section,'ignore_initial',
-                          global_conf['ignore_initial'])
+                          global_conf['ig_init'])
     bounce_time = get_value(cparser,section,'bounce_time',
                              global_conf['bounce_time'])
     info[gpio] = {'command':     command,
@@ -145,24 +150,22 @@ def signal_handler(_signo, _stack_frame):
     fifo.close()
   sys.exit(0)
 
- # --- main program   ------------------------------------------------------
+# --- main program   ------------------------------------------------------
 
+debug='0'
 syslog.openlog("gpio-poll")
-parser = ConfigParser.RawConfigParser({'debug': '0',
-                                       'ignore_initial': '0',
-                                       'active_low': '0',
-                                       'edge': 'both'})
+parser = ConfigParser.RawConfigParser()
+
 # read configuration
 parser.read('/etc/gpio-poll.conf')
-global_conf = get_global(parser)
-debug = global_conf['debug']
+global_conf = get_global(parser)        # also sets debug
 info = get_config(parser,global_conf)
 
 # dump configuration to system log
 write_log("Global-config: " + str(global_conf))
 gpios = global_conf['gpios']
 write_log("GPIOs: " + str(gpios))
-write_log("Config-gpios: " + str(info))
+write_log("GPIO-config: " + str(info))
 
 # setup signal handlers and pins
 signal.signal(signal.SIGTERM, signal_handler)
@@ -228,7 +231,7 @@ while True:
     bounce_limit = float(gpio_info['bounce_time'])
     if  bounce_limit > 0.0:
       if int_repeat < bounce_limit:
-        write_log"ignoring event (repeat-time less than bounce_time)"
+        write_log("ignoring event (repeat-time less than bounce_time)")
         continue
 
     # ...and update current timestamp
