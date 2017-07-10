@@ -236,7 +236,8 @@ while True:
     bounce_limit = float(gpio_info['bounce_time'])
     if  bounce_limit > 0.0:
       if int_repeat < bounce_limit:
-        write_log("ignoring event (repeat-time less than bounce_time)")
+        write_log("ignoring event (repeat-time %g less than bounce_time %g)"
+                  % (int_repeat,bounce_limit)))
         continue
 
     # ...and update current timestamp
